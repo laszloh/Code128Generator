@@ -2,8 +2,11 @@
 
 #include <QList>
 #include <QByteArray>
+#include <QPaintEvent>
+#include <QSize>
 
 const int GenCode128::quietWidth = 10;
+const int GenCode128::whScale = 40;
 
 const char *GenCode128::codeset[107] = {
     "212222", "222122", "222221", "121223", "121322",  /*  0 -  4 */
@@ -45,22 +48,93 @@ const char *GenCode128::codeset[107] = {
 #define NEED_CODE_A(c) ((c)<32 || (c)==0x80)
 #define NEED_CODE_B(c) ((c)>=96 && (c)<128)
 
-GenCode128::GenCode128(QString inputData, int barWeight, bool addQuietZone, QObject *parent) :
-    QObject(parent)
+GenCode128::GenCode128(bool quietZone, bool humanReadable, int barWeigth, QWidget *parent) :
+    GenCode128(parent)
 {
-    this->barWeight = barWeight;
-    this->addQuietZone = addQuietZone;
-    this->inputData = inputData;
+    this->quietZone = quietZone;
+    this->humanReadable = humanReadable;
+    this->barWeigth = barWeigth;
 }
 
-GenCode128::~GenCode128()
+GenCode128::GenCode128(QWidget *parent):
+    QLabel(parent)
 {
-    delete painter;
+    this->quietZone = true;
+    this->humanReadable = true;
+    this->barWeigth = 2;
 }
 
-void GenCode128::getBarcodeAsImage(QPaintDevice *surface)
+QSize GenCode128::minimumSize()
 {
+    QSize s = QLabel::sizeHint();
 
+    int height = barWeigth * whScale;
+    int width = 0;
+    // calculate barcode size
+    QString barcode = getBarcodeAsString();
+    for(int i=0;i<barcode.count();i++) {
+        width += barcode[i].digitValue()*barWeigth;
+    }
+
+    if(quietZone)
+        width += 2 * quietWidth * barWeigth;
+
+    return QSize(qMax(s.width(),width),s.height() + height);
+}
+
+void GenCode128::setText(const QString text)
+{
+    QLabel::setText(text);
+    this->update();
+}
+
+/**
+ * @brief GenCode128::getBarcodeAsString
+ * @return
+ */
+QString GenCode128::getBarcodeAsString()
+{
+    QString barcode;
+    QList<int> codes = StringToCode128(text());
+
+    for(int i=0;i<codes.count();i++) {
+        barcode.append(codeset[codes[i]]);
+    }
+
+    return barcode;
+}
+
+/**
+ * @brief GenCode128::paintEvent
+ * @param event
+ */
+void GenCode128::paintEvent(QPaintEvent *event)
+{
+    QPainter p;
+    QSize s = minimumSize();
+    int height = event->rect().height();
+    int x = (event->rect().width() - s.width())/2;
+    x += (quietZone) ? quietWidth * barWeigth : 0;
+
+    p.begin(this);
+    p.setPen(QColor::fromRgb(0,0,0));
+    p.fillRect(event->rect(),QBrush(QColor::fromRgb(255,255,255)));
+
+    if(humanReadable){
+        p.drawText(event->rect(),Qt::AlignHCenter|Qt::AlignBottom,text());
+        // leave place for the text!
+        height -= (this->fontMetrics().boundingRect(this->text()).height() + 5);
+    }
+
+    QString barcode = getBarcodeAsString();
+    for(int i=0;i<barcode.count();i++) {
+        int width = barcode[i].digitValue() * barWeigth;
+        if( !(i & 0x01))
+            p.fillRect(x, 0, width, height, QColor::fromRgb(0,0,0));
+        x += width;
+    }
+
+    p.end();
 }
 
 /**
@@ -89,12 +163,12 @@ QList<int> GenCode128::StringToCode128(QString input)
     }
 
     codes.append(START_A + code - 'A');
-    for(unsigned char *ptr=s; *ptr; /*incrementing in the loop*/){
+    for(/*directly using s*/; *s; /*incrementing in the loop*/){
         switch (code) {
         case 'C':
                 if(s[0] == 0xC1) {
                     codes.append(FUNC_1);
-                    ptr++;
+                    s++;
                 }else if(QChar::isDigit(s[0]) && QChar::isDigit(s[1])){
                     // encode and consume the two digits
                     codes.append((s[0]-'0')*10 + s[1]-'0');
@@ -210,35 +284,32 @@ int GenCode128::BarcodeEncodeAs(unsigned char code, unsigned char c)
     return -1;
 
 }
-
-QString GenCode128::getInputData() const
+int GenCode128::getBarWeigth() const
 {
-    return inputData;
+    return barWeigth;
 }
 
-void GenCode128::setInputData(const QString &value)
+void GenCode128::setBarWeigth(int value)
 {
-    inputData = value;
+    barWeigth = value;
 }
 
-bool GenCode128::getAddQuietZone() const
+bool GenCode128::getHumanReadable() const
 {
-    return addQuietZone;
+    return humanReadable;
 }
 
-void GenCode128::setAddQuietZone(bool value)
+void GenCode128::setHumanReadable(bool value)
 {
-    addQuietZone = value;
+    humanReadable = value;
 }
 
-int GenCode128::getBarWeight() const
+bool GenCode128::getQuietZone() const
 {
-    return barWeight;
+    return quietZone;
 }
 
-void GenCode128::setBarWeight(int value)
+void GenCode128::setQuietZone(bool value)
 {
-    barWeight = value;
+    quietZone = value;
 }
-
-

@@ -1,35 +1,39 @@
 #ifndef GENCODE128_H
 #define GENCODE128_H
 
-#include <QObject>
+#include <QLabel>
 #include <QArrayData>
 #include <QPainter>
-#include <QPixmap>
 
 
-class GenCode128 : public QObject
+class GenCode128 : public QLabel
 {
     Q_OBJECT
 public:
-    explicit GenCode128(QString inputData, int barWeight, bool addQuietZone, QObject *parent = 0);
-    ~GenCode128();
+    explicit GenCode128(bool quietZone, bool humanReadable, int barWeigth, QWidget *parent = 0);
+    explicit GenCode128(QWidget *parent = 0);
 
-    void getBarcodeAsImage(QPaintDevice *surface);
+    QSize minimumSize();
+    void setText(const QString text);
 
-    int getBarWeight() const;
-    void setBarWeight(int value);
+    QString getBarcodeAsString();
 
-    bool getAddQuietZone() const;
-    void setAddQuietZone(bool value);
+    bool getQuietZone() const;
+    void setQuietZone(bool value);
 
-    QString getInputData() const;
-    void setInputData(const QString &value);
+    bool getHumanReadable() const;
+    void setHumanReadable(bool value);
+
+    int getBarWeigth() const;
+    void setBarWeigth(int value);
 
 signals:
 
 public slots:
 
 private:
+    void paintEvent(QPaintEvent *event);
+
     QList<int> StringToCode128(QString input);
 
     int SelectBarcodeAorB(unsigned char c);
@@ -37,14 +41,12 @@ private:
 
 private:
     static const int quietWidth;
+    static const int whScale;
     static const char *codeset[107];
 
-    int barWeight;
-    bool addQuietZone;
-    QString inputData;
-
-    QPainter *painter;
-    QList<int> codeList;
+    bool quietZone;
+    bool humanReadable;
+    int barWeigth;
 };
 
 #endif // GENCODE128_H
